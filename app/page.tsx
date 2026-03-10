@@ -15,6 +15,7 @@ interface ListingResult {
 
 export default function Home() {
   const [apiKey, setApiKey] = useState('')
+  const [groupId, setGroupId] = useState('')
   const [productName, setProductName] = useState('')
   const [keywords, setKeywords] = useState('')
   const [productFeatures, setProductFeatures] = useState('')
@@ -46,6 +47,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           apiKey: testMode ? 'test' : apiKey,
+          groupId: testMode ? '' : groupId,
           productName,
           keywords,
           productFeatures,
@@ -144,6 +146,25 @@ export default function Home() {
                   <span className="text-sm text-gray-600">测试模式（无需 API Key）</span>
                 </label>
               </div>
+
+              {/* Group ID - 仅在非测试模式显示 */}
+              {!testMode && (
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Group ID（可选）
+                  </label>
+                  <input
+                    type="text"
+                    value={groupId}
+                    onChange={(e) => setGroupId(e.target.value)}
+                    placeholder="如果 API 调用失败请填写 Group ID"
+                    className="input-field"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    在 MiniMax 控制台 → 我的应用 获取
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* 产品信息 */}
