@@ -19,7 +19,6 @@ interface ListingResult {
   description: string
 }
 
-// 生成提示词
 function buildPrompt(data: GenerateRequest): string {
   const toneMap: Record<string, string> = {
     professional: 'Professional and business-like',
@@ -28,52 +27,26 @@ function buildPrompt(data: GenerateRequest): string {
     friendly: 'Warm and approachable',
   }
 
-  return `You are an expert Amazon product listing copywriter. Generate a high-converting Amazon Listing based on the following information:
+  return `Generate an Amazon product listing. 
 
-Product Name: ${data.productName}
+Product: ${data.productName}
 Keywords: ${data.keywords}
-Product Features: ${data.productFeatures || 'Not specified'}
+Features: ${data.productFeatures || 'Not specified'}
 Tone: ${toneMap[data.tone] || toneMap.professional}
 
-Output in JSON format with exactly these keys:
-{
-  "title": "Amazon product title (max 200 characters)",
-  "bullet1": "Bullet point 1",
-  "bullet2": "Bullet point 2", 
-  "bullet3": "Bullet point 3",
-  "bullet4": "Bullet point 4",
-  "bullet5": "Bullet point 5",
-  "description": "Product description"
+Output ONLY valid JSON:
+{"title":"...","bullet1":"...","bullet2":"...","bullet3":"...","bullet4":"...","bullet5":"...","description":"..."}`
 }
 
-Requirements:
-- Use persuasive copy that drives conversions
-- Naturally incorporate keywords
-- Focus on customer benefits
-- Output ONLY valid JSON`
-}
-
-// 模拟数据
 function getMockResult(data: GenerateRequest): ListingResult {
   return {
-    title: `${data.productName} - Premium Quality with Advanced Features | ${data.keywords.split(',')[0].trim()}`,
-    bullet1: `【Advanced Technology】Equipped with cutting-edge ${data.keywords.split(',')[0].trim()} technology for superior performance.`,
-    bullet2: `【Long Battery Life】Extended usage time ensures you stay connected throughout the day.`,
-    bullet3: `【Premium Design】Ergonomic and stylish design provides maximum comfort.`,
-    bullet4: `【Easy to Use】Simple plug-and-play setup works instantly with all your devices.`,
-    bullet5: `【Customer Support】24/7 dedicated support and warranty included.`,
-    description: `Introducing our premium ${data.productName}, designed for discerning customers who demand the best.
-
-This exceptional product combines cutting-edge technology with elegant design to deliver an unparalleled experience.
-
-Key Features:
-• Advanced ${data.keywords.split(',')[0].trim()} technology
-• Premium build quality
-• Sleek, modern design
-• Easy setup and intuitive operation
-• Comprehensive warranty
-
-Perfect for ${data.keywords}, this product is meticulously crafted to exceed your expectations.`,
+    title: `${data.productName} - Premium Quality | ${data.keywords.split(',')[0].trim()}`,
+    bullet1: `Advanced ${data.keywords.split(',')[0].trim()} technology for superior performance.`,
+    bullet2: `Long battery life for all-day use.`,
+    bullet3: `Premium ergonomic design for maximum comfort.`,
+    bullet4: `Easy setup and intuitive operation.`,
+    bullet5: `24/7 customer support and warranty included.`,
+    description: `Premium ${data.productName} with advanced features. Perfect for ${data.keywords}.`,
   }
 }
 
@@ -81,148 +54,109 @@ export async function POST(request: NextRequest) {
   try {
     const body: GenerateRequest = await request.json()
     
-    if (!body.apiKey) {
-      return NextResponse.json(
-        { error: 'API Key 不能为空' },
-        { status: 400 }
-      )
-    }
-    
-    if (!body.productName || !body.keywords) {
-      return NextResponse.json(
-        { error: '产品名称和关键词不能为空' },
-        { status: 400 }
-      )
-    }
-
-    // 测试模式
-    if (body.apiKey === 'test') {
+    if (!body.apiKey || body.apiKey === 'test') {
       return NextResponse.json({ 
         result: getMockResult(body),
         isTestMode: true 
       })
     }
+    
+    if (!body.productName || !body.keywords) {
+      return NextResponse.json({ error: '缺少必要参数' }, { status: 400 })
+    }
 
     const prompt = buildPrompt(body)
-    
-    // MiniMax API 调用 - 需要 Group ID
-    const groupId = body.groupId || ''
-    
-    if (!groupId) {
-      // 没有 Group ID，尝试使用新版本 API
-      const response = await fetch('https://api.minimax.chat/v1/text/chatcompletion_v2', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${body.apiKey}`,
-        },
-        body: JSON.stringify({
+    const { apiKey, groupId } = body
+
+    // 尝试多个 API 版本
+    const endpoints = [
+      // 尝试新版 API (不需要 Group ID)
+      {
+        url: 'https://api.minimax.chat/v1/text/chatcompletion_v2',
+        body: {
           model: 'abab6.5s-chat',
           messages: [
-            { role: 'system', content: 'You are an expert Amazon product listing copywriter.' },
+            { role: 'system', content: 'You are a professional Amazon listing writer. Always output valid JSON.' },
             { role: 'user', content: prompt }
           ],
           temperature: 0.7,
-          max_tokens: 2048,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('MiniMax API error (no group):', errorText)
-        
-        // API 失败，返回模拟数据并提示
-        return NextResponse.json({ 
-          result: getMockResult(body),
-          warning: `API 调用失败: ${errorText.slice(0, 100)}。请检查 API Key 和 Group ID 是否正确。`
-        })
-      }
-
-      const data = await response.json()
-      return handleAIResponse(data, body)
-    }
-
-    // 有 Group ID 的情况 - 使用旧版 API
-    const endpoint = `https://api.minimax.chat/v1/text/chatcompletion_pro?GroupId=${groupId}`
-    
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${body.apiKey}`,
+        }
       },
-      body: JSON.stringify({
-        model: 'abab6.5s-chat',
-        messages: [
-          { role: 'system', content: 'You are an expert Amazon product listing copywriter.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 2048,
-      }),
-    })
+      // 尝试旧版 API (需要 Group ID)
+      ...(groupId ? [{
+        url: `https://api.minimax.chat/v1/text/chatcompletion_pro?GroupId=${groupId}`,
+        body: {
+          model: 'abab6.5s-chat',
+          messages: [
+            { role: 'system', content: 'You are a professional Amazon listing writer. Always output valid JSON.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.7,
+        }
+      }] : [])
+    ]
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('MiniMax API error (with group):', errorText)
-      return NextResponse.json({ 
-        result: getMockResult(body),
-        warning: `API 调用失败: ${errorText.slice(0, 100)}`
-      })
+    let lastError = ''
+    
+    for (const ep of endpoints) {
+      try {
+        const response = await fetch(ep.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(ep.body),
+        })
+
+        if (!response.ok) {
+          lastError = await response.text()
+          continue
+        }
+
+        const data = await response.json()
+        console.log('MiniMax response:', JSON.stringify(data).slice(0, 500))
+        
+        // 提取内容
+        const content = data?.choices?.[0]?.message?.content || ''
+        
+        // 尝试解析 JSON
+        let result: ListingResult
+        try {
+          // 尝试直接解析
+          result = JSON.parse(content)
+        } catch {
+          // 尝试提取 JSON
+          const match = content.match(/\{[\s\S]*\}/)
+          if (match) {
+            result = JSON.parse(match[0])
+          } else {
+            throw new Error('No JSON found')
+          }
+        }
+
+        // 确保字段完整
+        if (result?.title) {
+          return NextResponse.json({ result })
+        }
+        
+        lastError = 'Invalid response structure'
+      } catch (e: any) {
+        lastError = e.message
+      }
     }
 
-    const data = await response.json()
-    return handleAIResponse(data, body)
+    // 所有 API 都失败，返回模拟数据
+    return NextResponse.json({ 
+      result: getMockResult(body),
+      warning: `API 调用失败: ${lastError.slice(0, 100)}。已返回测试数据。`
+    })
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error:', error)
     return NextResponse.json({ 
       result: getMockResult({ apiKey: '', groupId: '', productName: 'Sample', keywords: 'test', productFeatures: '', tone: 'professional' }),
-      error: '服务异常'
-    })
-  }
-}
-
-function handleAIResponse(data: any, body: GenerateRequest): NextResponse {
-  try {
-    const content = data.choices?.[0]?.message?.content || ''
-    console.log('AI response:', content)
-    
-    let jsonStr = content.trim()
-    if (jsonStr.startsWith('```')) {
-      jsonStr = jsonStr.replace(/^```\w*\n?/, '').replace(/```$/, '')
-    }
-    
-    let result: ListingResult
-    try {
-      result = JSON.parse(jsonStr)
-    } catch {
-      const match = jsonStr.match(/\{[\s\S]*\}/)
-      if (match) {
-        result = JSON.parse(match[0])
-      } else {
-        return NextResponse.json({ 
-          result: getMockResult(body),
-          warning: 'AI 响应格式解析失败，已返回测试数据'
-        })
-      }
-    }
-    
-    result = {
-      title: result?.title || '',
-      bullet1: result?.bullet1 || '',
-      bullet2: result?.bullet2 || '',
-      bullet3: result?.bullet3 || '',
-      bullet4: result?.bullet4 || '',
-      bullet5: result?.bullet5 || '',
-      description: result?.description || ''
-    }
-    
-    return NextResponse.json({ result })
-  } catch (e) {
-    return NextResponse.json({ 
-      result: getMockResult(body),
-      warning: '响应解析失败，已返回测试数据'
+      warning: '服务异常，已返回测试数据'
     })
   }
 }
