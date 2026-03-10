@@ -23,10 +23,12 @@ export default function Home() {
   const [result, setResult] = useState<ListingResult | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [showApiKey, setShowApiKey] = useState(false)
+  const [testMode, setTestMode] = useState(false)
+  const [warning, setWarning] = useState<string | null>(null)
 
   const handleGenerate = async () => {
-    if (!apiKey) {
-      alert('请输入 API Key')
+    if (!testMode && !apiKey) {
+      alert('请输入 API Key 或开启测试模式')
       return
     }
     if (!productName || !keywords) {
@@ -36,13 +38,14 @@ export default function Home() {
 
     setIsGenerating(true)
     setResult(null)
+    setWarning(null)
 
     try {
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          apiKey,
+          apiKey: testMode ? 'test' : apiKey,
           productName,
           keywords,
           productFeatures,
@@ -54,6 +57,12 @@ export default function Home() {
       if (data.error) {
         alert(data.error)
         return
+      }
+      if (data.warning) {
+        setWarning(data.warning)
+      }
+      if (data.isTestMode) {
+        setWarning('测试模式：已使用模拟数据')
       }
       setResult(data.result)
     } catch (error) {
@@ -100,15 +109,16 @@ export default function Home() {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  MiniMax API Key *
+                  MiniMax API Key {!testMode && '*'}
                 </label>
                 <div className="relative">
                   <input
                     type={showApiKey ? 'text' : 'password'}
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="在 platform.minimax.cn 获取 API Key"
+                    placeholder={testMode ? "测试模式无需填写" : "在 platform.minimax.cn 获取 API Key"}
                     className="input-field pr-10"
+                    disabled={testMode}
                   />
                   <button
                     type="button"
@@ -121,6 +131,18 @@ export default function Home() {
                 <p className="text-xs text-gray-500 mt-1">
                   你的 API Key 仅保存在浏览器本地，不会发送到服务器
                 </p>
+                <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={testMode}
+                    onChange={(e) => {
+                      setTestMode(e.target.checked)
+                      if (e.target.checked) setApiKey('test')
+                    }}
+                    className="w-4 h-4 text-primary rounded"
+                  />
+                  <span className="text-sm text-gray-600">测试模式（无需 API Key）</span>
+                </label>
               </div>
             </div>
 
@@ -207,6 +229,11 @@ export default function Home() {
 
           {/* 输出区 */}
           <div className="space-y-6">
+            {warning && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-700">
+                ⚠️ {warning}
+              </div>
+            )}
             {!result ? (
               <div className="glass-card p-12 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
