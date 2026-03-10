@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// MiniMax API 配置
-const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || ''
-const MINIMAX_GROUP_ID = process.env.MINIMAX_GROUP_ID || ''
-
 interface GenerateRequest {
+  apiKey: string
   productName: string
   keywords: string
   productFeatures: string
@@ -60,50 +57,33 @@ export async function POST(request: NextRequest) {
   try {
     const body: GenerateRequest = await request.json()
     
+    if (!body.apiKey) {
+      return NextResponse.json(
+        { error: 'API Key 不能为空，请在设置中输入您的 MiniMax API Key' },
+        { status: 400 }
+      )
+    }
+    
     if (!body.productName || !body.keywords) {
       return NextResponse.json(
-        { error: 'Product name and keywords are required' },
+        { error: '产品名称和关键词不能为空' },
         { status: 400 }
       )
     }
 
-    // 如果没有配置 MiniMax，返回模拟数据用于演示
-    if (!MINIMAX_API_KEY || !MINIMAX_GROUP_ID) {
-      console.warn('MiniMax API not configured, returning demo data')
-      
-      const demoResult: ListingResult = {
-        title: `${body.productName} - ${body.keywords.split(',')[0].trim()} with Premium Quality`,
-        bullet1: 'High-quality materials ensure durability and long-lasting performance',
-        bullet2: 'Ergonomic design provides comfort for extended use',
-        bullet3: 'Advanced technology delivers exceptional results',
-        bullet4: 'Easy to use with clear instructions included',
-        bullet5: '24/7 customer support and warranty included',
-        description: `Introducing our premium ${body.productName}, designed to meet your highest expectations. 
-
-Featuring cutting-edge technology and premium materials, this product delivers outstanding performance and reliability. Perfect for everyday use, it's been crafted with attention to detail and user experience in mind.
-
-Key Benefits:
-• Superior quality that stands the test of time
-• User-friendly design for effortless operation
-• Versatile functionality for multiple use cases
-• Excellent value for money
-
-Order now and experience the difference!`,
-      }
-      
-      return NextResponse.json({ result: demoResult })
-    }
-
+    // 用户提供了 API Key，使用用户的
+    const userApiKey = body.apiKey
+    
     // 调用 MiniMax API
     const prompt = buildPrompt(body)
     
     const response = await fetch(
-      `https://api.minimax.chat/v1/text/chatcompletion_pro?GroupId=${MINIMAX_GROUP_ID}`,
+      'https://api.minimax.chat/v1/text/chatcompletion_pro',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${MINIMAX_API_KEY}`,
+          'Authorization': `Bearer ${userApiKey}`,
         },
         body: JSON.stringify({
           model: 'abab6.5s-chat',
@@ -124,7 +104,12 @@ Order now and experience the difference!`,
     )
 
     if (!response.ok) {
-      throw new Error(`MiniMax API error: ${response.status}`)
+      const errorData = await response.json().catch(() => ({}))
+      const errorMsg = errorData?.base_resp?.status_msg || `API 请求失败: ${response.status}`
+      return NextResponse.json(
+        { error: errorMsg },
+        { status: response.status }
+      )
     }
 
     const data = await response.json()
@@ -133,16 +118,25 @@ Order now and experience the difference!`,
     let result: ListingResult
     try {
       const content = data.choices?.[0]?.message?.content || ''
-      result = JSON.parse(content)
-    } catch {
-      throw new Error('Failed to parse AI response')
+      // 尝试提取 JSON 部分
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) {
+        throw new Error('No JSON found in response')
+      }
+      result = JSON.parse(jsonMatch[0])
+    } catch (parseError) {
+      console.error('Parse error:', parseError)
+      return NextResponse.json(
+        { error: 'AI 响应格式解析失败，请重试' },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({ result })
   } catch (error) {
     console.error('Error generating listing:', error)
     return NextResponse.json(
-      { error: 'Failed to generate listing' },
+      { error: '生成失败，请检查 API Key 是否正确' },
       { status: 500 }
     )
   }

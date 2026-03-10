@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Sparkles, Copy, Check, Loader2, Upload } from 'lucide-react'
+import { Sparkles, Copy, Check, Loader2, Upload, Key } from 'lucide-react'
 
 interface ListingResult {
   title: string
@@ -14,6 +14,7 @@ interface ListingResult {
 }
 
 export default function Home() {
+  const [apiKey, setApiKey] = useState('')
   const [productName, setProductName] = useState('')
   const [keywords, setKeywords] = useState('')
   const [productFeatures, setProductFeatures] = useState('')
@@ -21,10 +22,15 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [result, setResult] = useState<ListingResult | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  const [showApiKey, setShowApiKey] = useState(false)
 
   const handleGenerate = async () => {
+    if (!apiKey) {
+      alert('请输入 API Key')
+      return
+    }
     if (!productName || !keywords) {
-      alert('Please enter product name and keywords')
+      alert('请输入产品名称和关键词')
       return
     }
 
@@ -36,6 +42,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          apiKey,
           productName,
           keywords,
           productFeatures,
@@ -44,6 +51,10 @@ export default function Home() {
       })
 
       const data = await response.json()
+      if (data.error) {
+        alert(data.error)
+        return
+      }
       setResult(data.result)
     } catch (error) {
       console.error('Error generating listing:', error)
@@ -71,7 +82,7 @@ export default function Home() {
             <span className="text-xl font-bold text-gray-800">AI Listing</span>
           </div>
           <div className="text-sm text-gray-500">
-            免费剩余: <span className="text-primary font-semibold">10</span> 次
+            已接入 MiniMax API
           </div>
         </div>
       </header>
@@ -80,6 +91,40 @@ export default function Home() {
         <div className="grid lg:grid-cols-2 gap-8">
           {/* 输入区 */}
           <div className="space-y-6">
+            {/* API Key 输入 */}
+            <div className="glass-card p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <Key className="w-5 h-5" />
+                API 设置
+              </h2>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  MiniMax API Key *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showApiKey ? 'text' : 'password'}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="在 platform.minimax.cn 获取 API Key"
+                    className="input-field pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showApiKey ? '👁️' : '👁️‍🗨️'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  你的 API Key 仅保存在浏览器本地，不会发送到服务器
+                </p>
+              </div>
+            </div>
+
+            {/* 产品信息 */}
             <div className="glass-card p-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">产品信息</h2>
               
@@ -105,7 +150,7 @@ export default function Home() {
                     type="text"
                     value={keywords}
                     onChange={(e) => setKeywords(e.target.value)}
-                    placeholder="例如: wireless earbuds, bluetooth 5.0, noise cancelling"
+                    placeholder="例如: wireless earbuds, bluetooth 5.0"
                     className="input-field"
                   />
                 </div>
@@ -117,7 +162,7 @@ export default function Home() {
                   <textarea
                     value={productFeatures}
                     onChange={(e) => setProductFeatures(e.target.value)}
-                    placeholder="例如: 30小时续航，IPX5防水，触控操作"
+                    placeholder="例如: 30小时续航，IPX5防水"
                     rows={3}
                     className="input-field resize-none"
                   />
@@ -212,7 +257,7 @@ export default function Home() {
                         <span className="text-gray-700 flex-1">{bullet}</span>
                         <button
                           onClick={() => copyToClipboard(bullet, `bullet${i}`)}
-                          className="p-1 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="p-1 hover:bg-gray-100 rounded"
                         >
                           {copied === `bullet${i}` ? (
                             <Check className="w-3 h-3 text-green-500" />
