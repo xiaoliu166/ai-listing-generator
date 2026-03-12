@@ -39,14 +39,25 @@ Output ONLY valid JSON:
 }
 
 function getMockResult(data: GenerateRequest): ListingResult {
+  // 根据 tone 返回不同的前缀
+  const tonePrefix: Record<string, string> = {
+    professional: 'Premium',
+    casual: 'Awesome',
+    luxury: 'Exclusive',
+    friendly: 'Amazing'
+  }
+  
+  const prefix = tonePrefix[data.tone] || tonePrefix.professional
+  const keyword = data.keywords.split(',')[0].trim()
+  
   return {
-    title: `${data.productName} - Premium Quality | ${data.keywords.split(',')[0].trim()}`,
-    bullet1: `Advanced ${data.keywords.split(',')[0].trim()} technology for superior performance.`,
+    title: `${prefix} ${data.productName} - ${keyword} Edition`,
+    bullet1: `Advanced ${keyword} technology for superior performance.`,
     bullet2: `Long battery life for all-day use.`,
     bullet3: `Premium ergonomic design for maximum comfort.`,
     bullet4: `Easy setup and intuitive operation.`,
     bullet5: `24/7 customer support and warranty included.`,
-    description: `Premium ${data.productName} with advanced features. Perfect for ${data.keywords}.`,
+    description: `${prefix} ${data.productName} with advanced features. Perfect for ${data.keywords}.`,
   }
 }
 
@@ -54,15 +65,16 @@ export async function POST(request: NextRequest) {
   try {
     const body: GenerateRequest = await request.json()
     
+    // 参数校验 - 优先校验必要参数
+    if (!body.productName || !body.keywords) {
+      return NextResponse.json({ error: '缺少必要参数' }, { status: 400 })
+    }
+    
     if (!body.apiKey || body.apiKey === 'test') {
       return NextResponse.json({ 
         result: getMockResult(body),
         isTestMode: true 
       })
-    }
-    
-    if (!body.productName || !body.keywords) {
-      return NextResponse.json({ error: '缺少必要参数' }, { status: 400 })
     }
 
     const prompt = buildPrompt(body)

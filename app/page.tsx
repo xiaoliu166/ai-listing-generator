@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Sparkles, Copy, Check, Loader2, Upload, Key } from 'lucide-react'
+import { Sparkles, Copy, Check, Loader2, Upload, Key, Search } from 'lucide-react'
+import Link from 'next/link'
 
 interface ListingResult {
   title: string
@@ -92,8 +93,12 @@ export default function Home() {
             </div>
             <span className="text-xl font-bold text-gray-800">AI Listing</span>
           </div>
-          <div className="text-sm text-gray-500">
-            已接入 MiniMax API
+          <div className="flex items-center gap-4">
+            <Link href="/analyze" className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors">
+              <Search className="w-4 h-4" />
+              竞品分析
+            </Link>
+            <span className="text-sm text-gray-500">已接入 MiniMax API</span>
           </div>
         </div>
       </header>
