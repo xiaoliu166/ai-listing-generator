@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Sparkles, Copy, Check, Loader2, FileText } from 'lucide-react'
+import { Sparkles, Copy, Check, Loader2, FileText, AlertCircle } from 'lucide-react'
 
 interface ListingResult {
   title: string
