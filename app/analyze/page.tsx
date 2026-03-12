@@ -31,6 +31,7 @@ export default function AnalyzePage() {
   const [asins, setAsins] = useState('')
   const [domain, setDomain] = useState('com')
   const [includeReviews, setIncludeReviews] = useState(false)
+  const [testMode, setTestMode] = useState(true)  // 默认测试模式
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [results, setResults] = useState<AnalyzeResult[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -65,6 +66,7 @@ export default function AnalyzePage() {
           asins: asinList,
           domain,
           includeReviews,
+          testMode,
           userId: 'web_user'
         })
       })
@@ -129,7 +131,7 @@ export default function AnalyzePage() {
             </div>
 
             {/* Domain & Options */}
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-slate-300 mb-2 font-medium">站点</label>
                 <select
@@ -143,7 +145,7 @@ export default function AnalyzePage() {
                 </select>
               </div>
 
-              <div className="md:col-span-2 flex items-end">
+              <div className="md:col-span-3 flex items-end gap-4">
                 <label className="flex items-center gap-3 cursor-pointer bg-slate-700/30 px-4 py-3 rounded-xl border border-slate-600 hover:border-purple-500 transition-colors">
                   <input
                     type="checkbox"
@@ -151,7 +153,17 @@ export default function AnalyzePage() {
                     onChange={(e) => setIncludeReviews(e.target.checked)}
                     className="w-5 h-5 rounded text-purple-500"
                   />
-                  <span className="text-slate-300">包含评论分析（需要更长时间）</span>
+                  <span className="text-slate-300">包含评论分析</span>
+                </label>
+                
+                <label className="flex items-center gap-3 cursor-pointer bg-purple-700/30 px-4 py-3 rounded-xl border border-purple-500 hover:border-purple-400 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={testMode}
+                    onChange={(e) => setTestMode(e.target.checked)}
+                    className="w-5 h-5 rounded text-purple-500"
+                  />
+                  <span className="text-purple-300">测试模式（模拟数据）</span>
                 </label>
               </div>
             </div>
